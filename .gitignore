@@ -1,22 +1,249 @@
-### AL ###
-#Template for AL projects for Dynamics 365 Business Central
-#launch.json folder
-.vscode/
-#Cache folder
-.alcache/
-#Symbols folder
-.alpackages/
-#Snapshots folder
-.snapshots/
-#Testing Output folder
-.output/
-#Extension App-file
-*.app
-#Rapid Application Development File
-rad.json
-#Translation Base-file
-*.g.xlf
-#License-file
-*.flf
-#Test results file
-TestResults.xml
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subida de PDFs — Chiringuito Sa Punta</title>
+  <meta name="description" content="Portal seguro para subir archivos PDF a Tu Empresa" />
+  <style>
+    :root{
+      --radius: 12px;
+      --shadow: 0 10px 25px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
+      line-height:1.5;
+      background: url("gb_5829b2eee1802.png") no-repeat center center fixed;
+      background-size: cover;
+      color:#182230;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .card{
+      width:min(920px, 100%);
+      background:rgba(255,255,255,0.9);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    header{
+      padding:22px 26px;
+      border-bottom:1px solid #eef0f3;
+      display:flex;align-items:center;gap:14px;justify-content:space-between
+    }
+    header h1{
+      margin:0;font-size:18px;font-weight:700;letter-spacing:.2px
+    }
+    header .badge{
+      font-size:12px;background:#eef6ff;border:1px solid #d6e8ff;
+      color:#1a5fff;border-radius:999px;padding:4px 10px
+    }
+    main{padding:24px}
+    .uploader{
+      border:2px dashed #d7dbe3;border-radius:var(--radius);
+      background:#fbfcfe;
+      padding:24px; text-align:center;
+      transition:.25s border-color ease;
+    }
+    .uploader.dragover{border-color:#1a5fff;background:#f4f8ff}
+    .uploader input{display:none}
+    .uploader .cta{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:10px 14px;border-radius:10px;border:1px solid #e3e7ee;
+      background:#fff;cursor:pointer;font-weight:600;font-size:14px
+    }
+    .muted{color:#5b6677;font-size:13px;margin-top:8px}
+    .list{margin-top:20px;display:grid;gap:12px}
+    .row{
+      display:grid;grid-template-columns:1fr auto;gap:8px;
+      border:1px solid #eef0f3;border-radius:12px;padding:12px 14px;background:#fff
+    }
+    .name{font-weight:600}
+    .meta{font-size:12px;color:#5b6677}
+    .right{display:flex;align-items:center;gap:10px}
+    .pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#eef6ff;color:#1a5fff;border:1px solid #d6e8ff}
+    .danger{background:#ffefef;color:#b71c1c;border-color:#ffd3d3}
+    .progress{height:6px;background:#eef0f3;border-radius:999px;overflow:hidden;margin-top:8px}
+    .progress > span{display:block;height:100%;width:0;background:#1a5fff;transition:width .2s}
+    button, .btn{
+      border:1px solid #e3e7ee;background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer
+    }
+    .footer{
+      display:flex;justify-content:space-between;align-items:center;margin-top:20px;
+      font-size:12px;color:#5b6677
+    }
+    .hidden{display:none !important}
+    .success{
+      font-size:14px;background:#ecfdf5;border:1px solid #bbf7d0;color:#065f46;padding:8px 10px;border-radius:10px
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="region" aria-labelledby="title">
+    <header>Curriculum Vitae — <span id="companyName">Chiringuito Sa Punta</span></h1>
+      <span class="badge" aria-label="archivos permitidos">Solo PDF • máx. 20MB</span>
+    </header>
+    <main>
+      <div id="alert" class="success hidden" role="status" aria-live="polite"></div>
+
+      <form id="uploadForm" class="uploader" enctype="multipart/form-data" novalidate>
+        <input id="fileInput" type="file" name="files" accept="application/pdf" multiple aria-label="Seleccionar archivos PDF" />
+        <p><strong>Arrastra tus archivos PDF aquí</strong> o</p>
+        <label for="fileInput" class="cta" role="button" tabindex="0">Buscar archivos</label>
+        <p class="muted">Aceptamos únicamente documentos PDF (máximo 20 MB por archivo).</p>
+      </form>
+
+      <div id="fileList" class="list" aria-live="polite"></div>
+
+      <div class="footer">
+        <div>¿Necesitas ayuda? Escríbenos a <a href="mailto:soporte@tu-empresa.com">soporte@tu-empresa.com</a></div>
+        <div>CSRF: <code id="csrfHint">no-configurado</code></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const CONFIG = {
+      companyName: "Tu Empresa",
+      uploadUrl: "/upload",
+      maxFileSizeMB: 20,
+      csrfHeader: "X-CSRF-Token",
+      csrfToken: "",
+      allowedTypes: ["application/pdf"]
+    };
+    document.getElementById("companyName").textContent = CONFIG.companyName;
+    document.getElementById("csrfHint").textContent = CONFIG.csrfToken || "no-configurado";
+
+    const $form = document.getElementById("uploadForm");
+    const $fileInput = document.getElementById("fileInput");
+    const $list = document.getElementById("fileList");
+    const $alert = document.getElementById("alert");
+
+    function fmtBytes(n){
+      const units = ["B","KB","MB","GB"];
+      let i=0, v=n;
+      while(v>=1024 && i<units.length-1){ v/=1024; i++; }
+      return v.toFixed(v<10?2:0)+" "+units[i];
+    }
+
+    function showAlert(msg){
+      $alert.textContent = msg;
+      $alert.classList.remove("hidden");
+      setTimeout(()=> $alert.classList.add("hidden"), 4000);
+    }
+
+    function makeRow(file){
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `
+        <div>
+          <div class="name">${file.name}</div>
+          <div class="meta">${fmtBytes(file.size)}</div>
+          <div class="progress"><span></span></div>
+        </div>
+        <div class="right">
+          <span class="pill">pendiente</span>
+          <button type="button" aria-label="Quitar archivo">Quitar</button>
+        </div>
+      `;
+      return row;
+    }
+
+    function validate(file){
+      const typeOk = CONFIG.allowedTypes.includes(file.type) || file.name.toLowerCase().endsWith(".pdf");
+      const sizeOk = file.size <= CONFIG.maxFileSizeMB*1024*1024;
+      return {typeOk, sizeOk};
+    }
+
+    function addFiles(files){
+      [...files].forEach(file => {
+        const {typeOk, sizeOk} = validate(file);
+        const row = makeRow(file);
+        const pill = row.querySelector(".pill");
+        const btn = row.querySelector("button");
+        const bar = row.querySelector(".progress > span");
+
+        if(!typeOk || !sizeOk){
+          pill.textContent = !typeOk ? "tipo inválido" : "muy grande";
+          pill.classList.add("danger");
+          row.dataset.invalid = "1";
+        }
+
+        btn.addEventListener("click", ()=> row.remove());
+        row.file = file;
+        row.bar = bar;
+        row.pill = pill;
+        $list.appendChild(row);
+      });
+    }
+
+    ["dragenter","dragover"].forEach(evt =>
+      $form.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); $form.classList.add("dragover"); })
+    );
+    ["dragleave","drop"].forEach(evt =>
+      $form.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); $form.classList.remove("dragover"); })
+    );
+    $form.addEventListener("drop", e => addFiles(e.dataTransfer.files));
+    $fileInput.addEventListener("change", e => addFiles(e.target.files));
+
+    const observer = new MutationObserver(() => {
+      const rows = [...$list.querySelectorAll(".row")].filter(r => !r.dataset.invalid && !r.dataset.uploaded && !r.dataset.uploading);
+      if(rows.length) uploadRows(rows);
+    });
+    observer.observe($list, {childList:true});
+
+    async function uploadRows(rows){
+      for(const row of rows){
+        const file = row.file;
+        row.dataset.uploading = "1";
+        row.pill.textContent = "subiendo…";
+
+        const data = new FormData();
+        data.append("files", file, file.name);
+
+        try{
+          await new Promise((resolve, reject)=>{
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", CONFIG.uploadUrl);
+            if(CONFIG.csrfToken) xhr.setRequestHeader(CONFIG.csrfHeader, CONFIG.csrfToken);
+            xhr.upload.onprogress = (e)=>{
+              if(e.lengthComputable){
+                const pct = (e.loaded / e.total) * 100;
+                row.bar.style.width = pct.toFixed(1) + "%";
+              }
+            };
+            xhr.onload = ()=>{
+              if(xhr.status>=200 && xhr.status<300){
+                row.pill.textContent = "subido";
+                row.dataset.uploaded = "1";
+                resolve();
+              }else{
+                row.pill.textContent = "error";
+                row.pill.classList.add("danger");
+                reject(new Error("Error " + xhr.status));
+              }
+            };
+            xhr.onerror = ()=>{
+              row.pill.textContent = "error red";
+              row.pill.classList.add("danger");
+              reject(new Error("network"));
+            };
+            xhr.send(data);
+          });
+        }catch(err){
+          console.error(err);
+          continue;
+        }finally{
+          row.dataset.uploading = "";
+        }
+      }
+      const uploaded = $list.querySelectorAll('.row[data-uploaded="1"]').length;
+      if(uploaded) showAlert(uploaded + " archivo(s) subidos correctamente.");
+    }
+  </script>
+</body>
+</html>
